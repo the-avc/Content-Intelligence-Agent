@@ -10,11 +10,11 @@ import "dotenv/config";
 
 // The default request from the project specification
 const defaultRequest: ContentRequest = {
-  topic: "Impact of AI coding assistants on software development",
-  platform: "LinkedIn",
-  audience: "Computer science students and software developers",
-  objective: "Educational",
-  style: "Technical but understandable",
+  topic: "Robert Downey Jr returning to the MCU as Doctor Doom in Avengers: Doomsday",
+  platform: "Twitter",
+  audience: "Marvel fans and pop culture enthusiasts",
+  objective: "Conversational",
+  style: "Engaging, punchy, and hype-building",
 };
 
 async function main() {

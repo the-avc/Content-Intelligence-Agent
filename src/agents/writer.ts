@@ -93,12 +93,23 @@ Write the post now. Track which evidence IDs you used in claimsUsed.`;
         (sum, r) => sum + (r.usage?.outputTokens ?? 0),
         0
     );
+    const totalCachedTokens = result.rawResponses.reduce(
+        (sum, r) => {
+            const details = r.usage?.inputTokensDetails;
+            if (Array.isArray(details)) {
+                return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
+            }
+            return sum;
+        },
+        0
+    );
 
     recordCall({
         agentName: `Writer Agent (v${version})`,
         model: MODEL,
         inputTokens: totalInputTokens,
         outputTokens: totalOutputTokens,
+        cachedInputTokens: totalCachedTokens,
         durationMs,
     });
 
@@ -162,12 +173,23 @@ Write an improved version that addresses all the problems listed.`;
         (sum, r) => sum + (r.usage?.outputTokens ?? 0),
         0
     );
+    const totalCachedTokens = result.rawResponses.reduce(
+        (sum, r) => {
+            const details = r.usage?.inputTokensDetails;
+            if (Array.isArray(details)) {
+                return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
+            }
+            return sum;
+        },
+        0
+    );
 
     recordCall({
         agentName: `Writer Agent (v${version})`,
         model: MODEL,
         inputTokens: totalInputTokens,
         outputTokens: totalOutputTokens,
+        cachedInputTokens: totalCachedTokens,
         durationMs,
     });
 
@@ -235,12 +257,23 @@ Write the improved version now.`;
   const totalOutputTokens = result.rawResponses.reduce(
     (sum, r) => sum + (r.usage?.outputTokens ?? 0), 0
   );
+  const totalCachedTokens = result.rawResponses.reduce(
+    (sum, r) => {
+      const details = r.usage?.inputTokensDetails;
+      if (Array.isArray(details)) {
+        return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
+      }
+      return sum;
+    },
+    0
+  );
 
   recordCall({
     agentName: `Writer Agent (evidence-v${version})`,
     model: MODEL,
     inputTokens:  totalInputTokens,
     outputTokens: totalOutputTokens,
+    cachedInputTokens: totalCachedTokens,
     durationMs,
   });
 

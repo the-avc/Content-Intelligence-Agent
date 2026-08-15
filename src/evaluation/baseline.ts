@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { recordCall } from "../utils/tokenTracker.js";
+import { recordCall, getModelPricing } from "../utils/tokenTracker.js";
 import { logSection, logInfo, logCost } from "../utils/logger.js";
 import type { ContentRequest } from "../types/schemas.js";
 import "dotenv/config";
@@ -56,17 +56,24 @@ Write the post now.
   const content = response.choices[0]?.message.content ?? "";
   const inputTokens  = response.usage?.prompt_tokens     ?? 0;
   const outputTokens = response.usage?.completion_tokens ?? 0;
+  const cachedTokens = response.usage?.prompt_tokens_details?.cached_tokens ?? 0;
 
-  // Calculate cost using the same pricing as our tracker
-  const inputCost  = (inputTokens  / 1_000_000) * 0.15;
-  const outputCost = (outputTokens / 1_000_000) * 0.60;
-  const costUSD    = inputCost + outputCost;
+  // Calculate cost using dynamic rates from the pricing module (prompt caching gets a 50% discount)
+  const pricing = getModelPricing(MODEL);
+  const cachedPrice = pricing.input * 0.5;
+  const standardInputCount = Math.max(0, inputTokens - cachedTokens);
+
+  const inputCost  = (standardInputCount / 1_000_000) * pricing.input;
+  const cachedCost = (cachedTokens / 1_000_000) * cachedPrice;
+  const outputCost = (outputTokens / 1_000_000) * pricing.output;
+  const costUSD    = inputCost + cachedCost + outputCost;
 
   recordCall({
     agentName: "Baseline (single LLM)",
     model: MODEL,
     inputTokens,
     outputTokens,
+    cachedInputTokens: cachedTokens,
     durationMs,
   });
 

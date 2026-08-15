@@ -85,12 +85,23 @@ Return your findings in the required structured format.`;
         (sum, r) => sum + (r.usage?.outputTokens ?? 0),
         0
     );
+    const totalCachedTokens = result.rawResponses.reduce(
+        (sum, r) => {
+            const details = r.usage?.inputTokensDetails;
+            if (Array.isArray(details)) {
+                return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
+            }
+            return sum;
+        },
+        0
+    );
 
     recordCall({
         agentName: "Research Agent",
         model: MODEL,
         inputTokens: totalInputTokens,
         outputTokens: totalOutputTokens,
+        cachedInputTokens: totalCachedTokens,
         durationMs,
     });
 

@@ -94,12 +94,23 @@ Set requiresRevision = true if overall score is below 7.0.`;
     (sum, r) => sum + (r.usage?.outputTokens ?? 0),
     0
   );
+  const totalCachedTokens = result.rawResponses.reduce(
+    (sum, r) => {
+      const details = r.usage?.inputTokensDetails;
+      if (Array.isArray(details)) {
+        return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
+      }
+      return sum;
+    },
+    0
+  );
 
   recordCall({
     agentName: "Critic Agent",
     model: EVALUATOR_MODEL,
     inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,
+    cachedInputTokens: totalCachedTokens,
     durationMs,
   });
 
