@@ -1,14 +1,3 @@
-// src/agents/critic.ts
-// The Critic Agent — evaluates the quality of the generated content
-//
-// This is completely separate from fact checking.
-// Fact checking = "is it TRUE?"
-// Critic = "is it GOOD?"
-//
-// The critic scores on 7 dimensions and provides specific feedback.
-// If overall score < QUALITY_THRESHOLD (default 7.0), 
-// Loop 2 kicks in and sends the content back to the Writer for revision.
-
 import { Agent, run } from "@openai/agents";
 import { CriticOutputSchema } from "../types/schemas.js";
 import type {
@@ -96,21 +85,20 @@ Set requiresRevision = true if overall score is below 7.0.`;
   const result = await run(criticAgent, inputMessage);
   const durationMs = Date.now() - startTime;
 
-    // Aggregate token usage across all model turns
-    // (RunResult has no top-level .usage; it lives in each rawResponse)
-    const totalInputTokens = result.rawResponses.reduce(
-        (sum, r) => sum + (r.usage?.inputTokens ?? 0),
-        0
-    );
-    const totalOutputTokens = result.rawResponses.reduce(
-        (sum, r) => sum + (r.usage?.outputTokens ?? 0),
-        0
-    );
+  // Aggregate token usage across all model turns
+  const totalInputTokens = result.rawResponses.reduce(
+    (sum, r) => sum + (r.usage?.inputTokens ?? 0),
+    0
+  );
+  const totalOutputTokens = result.rawResponses.reduce(
+    (sum, r) => sum + (r.usage?.outputTokens ?? 0),
+    0
+  );
 
   recordCall({
     agentName: "Critic Agent",
     model: EVALUATOR_MODEL,
-    inputTokens:  totalInputTokens,
+    inputTokens: totalInputTokens,
     outputTokens: totalOutputTokens,
     durationMs,
   });

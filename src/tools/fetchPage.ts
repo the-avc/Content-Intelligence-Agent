@@ -1,39 +1,20 @@
-// src/tools/fetchPage.ts
-// A tool that fetches and reads the full content of a web page
-//
-// HOW IT WORKS:
-// 1. The Research Agent finds an interesting URL from search results
-// 2. It calls this tool with that URL
-// 3. This tool downloads the raw HTML of the page
-// 4. We strip all the HTML tags to get just the readable text
-// 5. The agent reads that text and extracts evidence from it
-//
-// WHY DO WE NEED THIS?
-// Search results only give you a short snippet (2-3 sentences).
-// That's not enough to verify facts properly.
-// This tool fetches the FULL article so the agent has complete context.
-
 import { tool } from "@openai/agents";
 import { z } from "zod";
 import axios from "axios";
 
-// How much text to return — we limit this to save tokens
-// A full article can be 10,000+ words — we only need the key parts
 const MAX_TEXT_LENGTH = 3000;
 
-// Define what input this tool accepts
 const FetchPageInputSchema = z.object({
   url: z.string().url().describe("The full URL of the web page to fetch and read"),
 });
 
 // Remove HTML tags and clean up the text
-// This turns "<h1>Hello <b>World</b></h1>" into "Hello World"
 function stripHtml(html: string): string {
   return html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "") // remove script blocks
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")   // remove style blocks
-    .replace(/<[^>]+>/g, " ")                          // remove all other HTML tags
-    .replace(/\s+/g, " ")                              // collapse multiple spaces
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "") 
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")   
+    .replace(/<[^>]+>/g, " ")                          
+    .replace(/\s+/g, " ")                              
     .trim();
 }
 
@@ -48,7 +29,6 @@ export const fetchPageTool = tool({
 
   execute: async ({ url }) => {
     try {
-      // Fetch the raw HTML from the URL
       const response = await axios.get(url, {
         timeout: 10000, // Give up after 10 seconds
         headers: {
@@ -68,7 +48,6 @@ export const fetchPageTool = tool({
         return `Could not read this page — it is not an HTML page (type: ${contentType}).`;
       }
 
-      // Strip HTML tags to get plain text
       const cleanText = stripHtml(response.data as string);
 
       if (!cleanText || cleanText.length < 50) {
@@ -83,7 +62,6 @@ export const fetchPageTool = tool({
       return `Content from ${url}:\n\n${trimmed}`;
 
     } catch (error) {
-      // Handle common errors clearly
       if (axios.isAxiosError(error)) {
         if (error.code === "ECONNABORTED") {
           return `Timed out trying to load: ${url}`;

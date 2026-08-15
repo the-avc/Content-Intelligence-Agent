@@ -1,15 +1,3 @@
-// src/agents/researcher.ts
-// The Research Agent — finds facts and evidence about a topic
-//
-// This is the ONLY agent that uses tools (search + fetch page).
-// All other agents reason over data — this one goes out and GETS it.
-//
-// What it does:
-// 1. Takes a topic and audience as input
-// 2. Searches the web multiple times with different queries
-// 3. Reads full pages to extract detailed evidence
-// 4. Returns a structured list of facts, sources, and insights
-
 import { Agent, run } from "@openai/agents";
 import { searchWebTool, fetchPageTool } from "../tools/index.js";
 import { ResearchOutputSchema } from "../types/schemas.js";
@@ -21,13 +9,9 @@ import "dotenv/config";
 const MODEL = process.env.PRIMARY_MODEL ?? "gpt-4o-mini";
 
 // Create the Research Agent
-// Think of this like hiring a researcher with specific instructions
 const researchAgent = new Agent({
     name: "Research Agent",
     model: MODEL,
-
-    // Instructions = the agent's job description
-    // Be specific — vague instructions = vague output
     instructions: `
 You are an expert research agent. Your job is to find accurate, 
 specific information about a topic and return it in a structured format.
@@ -55,15 +39,10 @@ HOW TO DO YOUR JOB:
 IMPORTANT: Do not invent statistics or facts. Only report what you actually found.
 `,
 
-    // Attach the tools this agent can use
     tools: [searchWebTool, fetchPageTool],
-
-    // Tell the SDK what shape the output should be
-    // The agent will format its response to match this schema
     outputType: ResearchOutputSchema,
 });
 
-// The function you call to run the Research Agent
 // Returns structured research data
 export async function runResearchAgent(
     topic: string,
@@ -74,7 +53,6 @@ export async function runResearchAgent(
     logAgent("Research Agent", `Researching: "${topic}"`);
 
     // Build the input message for the agent
-    // This is what the agent reads as its task
     const inputMessage = additionalQueries && additionalQueries.length > 0
         ? `Research the following topic and return structured evidence.
        
@@ -86,7 +64,6 @@ identified from a previous research pass):
 ${additionalQueries.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 
 Return your findings in the required structured format.`
-
         : `Research the following topic and return structured evidence.
        
 Topic: ${topic}
@@ -96,15 +73,10 @@ Search broadly first, then dig into the most useful sources for specific facts.
 Return your findings in the required structured format.`;
 
     const startTime = Date.now();
-
-    // Run the agent — the SDK handles the tool calls automatically
-    // The agent will call search_web and fetch_page as many times as it needs
     const result = await run(researchAgent, inputMessage);
-
     const durationMs = Date.now() - startTime;
 
     // Aggregate token usage across all model turns
-    // (RunResult has no top-level .usage; it lives in each rawResponse)
     const totalInputTokens = result.rawResponses.reduce(
         (sum, r) => sum + (r.usage?.inputTokens ?? 0),
         0
@@ -114,7 +86,6 @@ Return your findings in the required structured format.`;
         0
     );
 
-    // Record token usage for cost tracking
     recordCall({
         agentName: "Research Agent",
         model: MODEL,
@@ -125,6 +96,5 @@ Return your findings in the required structured format.`;
 
     logAgent("Research Agent", `Done — found ${result.finalOutput?.facts.length ?? 0} evidence items`);
 
-    // finalOutput is already typed as ResearchOutput because of outputType above
     return result.finalOutput as ResearchOutput;
 }

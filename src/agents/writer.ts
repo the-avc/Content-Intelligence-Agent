@@ -1,15 +1,3 @@
-// src/agents/writer.ts
-// The Writer Agent — generates the actual social media content
-//
-// This agent runs in TWO modes:
-//
-// Mode 1 — Initial write:
-//   Gets research + strategy → writes a first draft
-//
-// Mode 2 — Revision:
-//   Gets the existing draft + critic feedback → rewrites it
-//   This is how Loop 2 (quality loop) works
-
 import { Agent, run } from "@openai/agents";
 import { GeneratedContentSchema, PLATFORM_CONSTRAINTS } from "../types/schemas.js";
 import type {
@@ -97,7 +85,6 @@ Write the post now. Track which evidence IDs you used in claimsUsed.`;
     const durationMs = Date.now() - startTime;
 
     // Aggregate token usage across all model turns
-    // (RunResult has no top-level .usage; it lives in each rawResponse)
     const totalInputTokens = result.rawResponses.reduce(
         (sum, r) => sum + (r.usage?.inputTokens ?? 0),
         0
@@ -167,7 +154,6 @@ Write an improved version that addresses all the problems listed.`;
     const durationMs = Date.now() - startTime;
 
     // Aggregate token usage across all model turns
-    // (RunResult has no top-level .usage; it lives in each rawResponse)
     const totalInputTokens = result.rawResponses.reduce(
         (sum, r) => sum + (r.usage?.inputTokens ?? 0),
         0

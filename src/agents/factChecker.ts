@@ -1,18 +1,3 @@
-// src/agents/factChecker.ts
-// The Fact Checker Agent — verifies claims against research evidence
-//
-// HOW IT WORKS:
-// 1. Reads the generated content
-// 2. Identifies every factual claim in it
-// 3. Looks up each claim against the research evidence we collected
-// 4. Assigns a status: SUPPORTED / PARTIALLY_SUPPORTED / UNSUPPORTED / etc.
-// 5. Returns an overall support rate
-//
-// LOOP 1 TRIGGER:
-// If supportRate < EVIDENCE_THRESHOLD (default 50%),
-// the pipeline re-runs the Research Agent with targeted queries
-// to find the missing evidence, then re-runs the Writer.
-
 import { Agent, run } from "@openai/agents";
 import { FactCheckOutputSchema } from "../types/schemas.js";
 import type { GeneratedContent, ResearchOutput, FactCheckOutput } from "../types/schemas.js";
@@ -21,9 +6,6 @@ import { recordCall } from "../utils/tokenTracker.js";
 import "dotenv/config";
 
 const MODEL = process.env.PRIMARY_MODEL ?? "gpt-4o-mini";
-
-// Note: We use the evaluator model here if set — fact checking benefits
-// from a more careful model
 const EVALUATOR_MODEL = process.env.EVALUATOR_MODEL ?? MODEL;
 
 const factCheckerAgent = new Agent({
@@ -94,7 +76,6 @@ against the evidence above. Return structured verification results.`;
     const durationMs = Date.now() - startTime;
 
     // Aggregate token usage across all model turns
-    // (RunResult has no top-level .usage; it lives in each rawResponse)
     const totalInputTokens = result.rawResponses.reduce(
         (sum, r) => sum + (r.usage?.inputTokens ?? 0),
         0

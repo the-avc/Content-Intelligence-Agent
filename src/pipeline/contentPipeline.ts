@@ -1,20 +1,3 @@
-// src/pipeline/contentPipeline.ts
-// The main pipeline — orchestrates all 5 agents in the correct order
-//
-// This file is the BRAIN of the project.
-// It controls which agent runs when, and what happens in each loop.
-//
-// THE DUAL-LOOP WORKFLOW:
-//
-// Research → Strategy → Writer → FactChecker ──────────────────┐
-//                  ↑                                            │ LOOP 1
-//                  └── Re-research if < 50% claims supported ───┘
-//                         ↓
-//                      Critic ────────────────────────────────┐
-//                        ↓                                    │ LOOP 2
-//                  Final Result ←── Writer (revise) ──────────┘
-//                                   if score < 7.0
-
 import { runResearchAgent } from "../agents/researcher.js";
 import { runStrategistAgent } from "../agents/strategist.js";
 import { runWriterAgent, runWriterRevision, runWriterWithNewEvidence } from "../agents/writer.js";
@@ -35,13 +18,11 @@ import type {
 import crypto from "crypto";
 import "dotenv/config";
 
-// Read loop limits from .env — defaults are safe values
 const MAX_EVIDENCE_LOOPS = parseInt(process.env.MAX_EVIDENCE_LOOPS ?? "2");
 const MAX_REVISION_LOOPS = parseInt(process.env.MAX_REVISION_LOOPS ?? "2");
 const EVIDENCE_THRESHOLD = parseFloat(process.env.EVIDENCE_THRESHOLD ?? "0.5");
 const QUALITY_THRESHOLD = parseFloat(process.env.QUALITY_THRESHOLD ?? "7.0");
 
-// Main function — call this to run the full pipeline
 export async function runContentPipeline(request: ContentRequest): Promise<PipelineResult> {
 
     // Create a unique ID for this run (used for log file names)
@@ -72,7 +53,7 @@ export async function runContentPipeline(request: ContentRequest): Promise<Pipel
 
     // ─── STEP 3 + LOOP 1: WRITE → FACT CHECK → RE-RESEARCH ────
     // This loop ensures the content is grounded in evidence.
-    // If the fact checker finds < 50% of claims are supported,
+    // If the fact checker finds < 70% of claims are supported,
     // we go back and research more, then rewrite.
     logSection("Step 3: Write + Fact Check (Evidence Loop)");
 
@@ -84,7 +65,6 @@ export async function runContentPipeline(request: ContentRequest): Promise<Pipel
     // LOOP 1 triggers if EITHER:
     // - the agent itself flagged re-research is needed (requiresReResearch)
     // - OR the support rate is below our configurable EVIDENCE_THRESHOLD
-    // This means EVIDENCE_THRESHOLD from .env is actually used here!
     while (
         (factCheckResult.requiresReResearch || factCheckResult.supportRate < EVIDENCE_THRESHOLD) &&
         evidenceLoopCount < MAX_EVIDENCE_LOOPS
@@ -109,7 +89,6 @@ export async function runContentPipeline(request: ContentRequest): Promise<Pipel
         }
 
         // Merge the new facts into the existing research
-        // (add new facts, avoid duplicates)
         const existingIds: Set<string> = new Set(research.facts.map(f => f.id));
         const newFacts: EvidenceItem[] = additionalResearch.facts.filter(f => !existingIds.has(f.id));
 
@@ -126,8 +105,8 @@ export async function runContentPipeline(request: ContentRequest): Promise<Pipel
         currentContent = await runWriterWithNewEvidence(
             request,
             research,
-            currentContent,                        // the existing draft
-            factCheckResult.unsupportedClaims,     // the specific claims that failed
+            currentContent,  // the existing draft
+            factCheckResult.unsupportedClaims, // the specific claims that failed
             evidenceLoopCount + 1
         );
         factCheckResult = await runFactCheckerAgent(currentContent, research);

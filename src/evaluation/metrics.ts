@@ -1,14 +1,3 @@
-// src/evaluation/metrics.ts
-// Compares the baseline result against the full pipeline result
-//
-// This is how you answer: "Was the multi-agent complexity worth it?"
-//
-// You look at:
-// - Cost: pipeline costs more (more API calls) — by how much?
-// - Speed: pipeline is slower — by how much?
-// - Quality: pipeline scores higher on eval — by how much?
-// - Fact support: pipeline has verified claims — baseline has none
-
 import type { PipelineResult } from "../types/schemas.js";
 import type { BaselineResult } from "./baseline.js";
 import { logSection } from "../utils/logger.js";
@@ -16,7 +5,6 @@ import { getTotalCost } from "../utils/tokenTracker.js";
 import fs from "fs";
 import path from "path";
 
-// What one comparison experiment looks like
 export type ComparisonResult = {
     topic: string;
     platform: string;
@@ -63,8 +51,6 @@ export function compareResults(
     const pipelineWords = pipeline.finalContent.content.split(/\s+/).filter(w => w.length > 0).length;
 
     // Total pipeline cost = sum of all agent calls
-    // (we track this in tokenTracker, but pipeline result doesn't store it directly)
-    // For comparison we estimate from what we have
     const pipelineCost = getTotalCost() - baseline.costUSD;
     const result: ComparisonResult = {
         topic,

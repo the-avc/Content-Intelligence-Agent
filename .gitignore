@@ -37,6 +37,7 @@ build/
 
 # Windows
 # Add Windows-specific ignores here
+learn.txt
 
 # npm
 # Add npm-specific ignores here

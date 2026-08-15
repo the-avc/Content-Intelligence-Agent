@@ -1,15 +1,3 @@
-// src/agents/strategist.ts
-// The Strategist Agent — turns research into a content plan
-//
-// This agent does NOT search the web. It reads the research output
-// from the Research Agent and decides HOW to present that information.
-//
-// What it decides:
-// - What angle to take (the specific framing of the content)
-// - What the opening hook should be
-// - What points to cover and in what order
-// - What to AVOID (claims with weak evidence)
-
 import { Agent, run } from "@openai/agents";
 import { ContentStrategySchema, PLATFORM_CONSTRAINTS } from "../types/schemas.js";
 import type { ResearchOutput, ContentRequest, ContentStrategy } from "../types/schemas.js";
@@ -45,7 +33,6 @@ Think about the platform format when creating the outline.
 LinkedIn posts are different from blog posts — adjust accordingly.
 `,
 
-    // No tools — this agent only thinks, it doesn't search
     outputType: ContentStrategySchema,
 });
 
@@ -56,10 +43,8 @@ export async function runStrategistAgent(
     logSection("Strategist Agent");
     logAgent("Strategist Agent", `Planning content strategy for: ${request.platform}`);
 
-    // Get the platform constraints so the strategist knows the limits
     const platformInfo = PLATFORM_CONSTRAINTS[request.platform];
 
-    // Build a clear summary of the research to pass to the strategist
     const researchSummary = research.facts
         .map(f => `[${f.id}] [${f.type}] [confidence: ${f.confidence}] ${f.content} (Source: ${f.source.url})`)
         .join("\n");
@@ -95,7 +80,6 @@ Return a structured content strategy.`;
     const durationMs = Date.now() - startTime;
 
     // Aggregate token usage across all model turns
-    // (RunResult has no top-level .usage; it lives in each rawResponse)
     const totalInputTokens = result.rawResponses.reduce(
         (sum, r) => sum + (r.usage?.inputTokens ?? 0),
         0

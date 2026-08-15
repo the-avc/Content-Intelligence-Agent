@@ -1,14 +1,3 @@
-// src/evaluation/baseline.ts
-// The baseline — a single LLM call with no agents, no research, no loops
-//
-// WHY THIS EXISTS:
-// Before claiming "my multi-agent system is better", you need to prove it.
-// This file runs the simplest possible version:
-//   Topic → One LLM call → Post
-//
-// You then compare that result against the full pipeline result.
-// If the multi-agent system isn't measurably better, that's a real finding too.
-
 import OpenAI from "openai";
 import { recordCall } from "../utils/tokenTracker.js";
 import { logSection, logInfo, logCost } from "../utils/logger.js";
@@ -18,7 +7,6 @@ import "dotenv/config";
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.PRIMARY_MODEL ?? "gpt-4o-mini";
 
-// What the baseline returns
 export type BaselineResult = {
   content: string;
   platform: string;
@@ -34,7 +22,6 @@ export async function runBaseline(request: ContentRequest): Promise<BaselineResu
   logSection("Baseline (Single LLM Call)");
   logInfo("Running baseline — no research, no agents, just one LLM call");
 
-  // This is the simplest possible prompt — what a non-agentic system would do
   const prompt = `
 Write a ${request.platform} post about the following topic.
 

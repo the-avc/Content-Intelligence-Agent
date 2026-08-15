@@ -1,39 +1,25 @@
-# 🕵️‍♂️ Evidence-Driven Multi-Agent Content Intelligence Pipeline
+# Content Intelligence Pipeline
 
-An advanced, production-ready, agentic social media content generation pipeline built in TypeScript using the official **OpenAI Agents SDK**. 
-
-This system moves beyond standard prompt-engineering and "single-call" LLM wrappers. It simulates a **fully functioning newsroom** with specialized AI agents working together through automated research, strategic outlining, factual verification, and quality-evaluation revision loops.
+An evidence-grounded, multi-agent editorial pipeline implemented in TypeScript using the `@openai/agents` SDK. The system orchestrates specialized autonomous agents to research, outline, draft, fact-check, and critically evaluate platform-specific content through deterministic self-correction feedback loops.
 
 ---
 
-## 🚀 Key Features
+## Architectural Overview
 
-* **Grounded in Research:** Uses a Web Search tool (via Tavily) and a Web Scraper to gather real-world, up-to-date evidence *before* writing any content.
-* **Dual-Loop Self-Correction Architecture:**
-  * **Loop 1 (Evidence Gap):** If the Fact-Checker agent determines that claims lack sufficient evidence, it forces the Researcher to execute targeted queries, then prompts the Writer to fix unsupported claims using the new facts.
-  * **Loop 2 (Quality Loop):** If the Critic agent scores the drafted content below a defined quality threshold, it forces the Writer into a revision loop with highly specific critique points.
-* **Strict Structured Output:** All agent-to-agent communication is tightly constrained using Zod schemas to ensure stability and prevent cascading hallucinations.
-* **Cost & Token Tracker:** Records exact token usage (prompt caching included) and estimates API costs in USD for every pipeline run in real-time.
-* **Baseline Comparison Mode:** Empirically proves its own value by running a single-prompt LLM control test and rendering a side-by-side terminal comparison of cost, speed, fact-support rate, and quality.
-
----
-
-## 🧠 Detailed Agent Workflow (The "Newsroom" Architecture)
-
-The pipeline employs 5 distinct agents. Their interaction is modeled in the Mermaid diagram below:
+Traditional single-prompt LLM generation often suffers from hallucinations, lack of factual verification, and unstructured editorial quality. This pipeline models a distributed editorial workflow with deterministic state machines and typed agent communication boundaries.
 
 ```mermaid
 flowchart TD
-    Main["src/main.ts (CLI Start)"]
-    Pipeline["src/pipeline/contentPipeline.ts"]
+    Main["src/main.ts (CLI Entrypoint)"]
+    Pipeline["src/pipeline/contentPipeline.ts (Orchestrator)"]
     
-    Researcher["src/agents/researcher.ts"]
-    Strategist["src/agents/strategist.ts"]
-    Writer["src/agents/writer.ts"]
-    FactChecker["src/agents/factChecker.ts"]
-    Critic["src/agents/critic.ts"]
+    Researcher["src/agents/researcher.ts (Research Agent)"]
+    Strategist["src/agents/strategist.ts (Strategy Agent)"]
+    Writer["src/agents/writer.ts (Writer Agent)"]
+    FactChecker["src/agents/factChecker.ts (Fact-Checker Agent)"]
+    Critic["src/agents/critic.ts (Critic Agent)"]
     
-    Output["Final Content + Metrics"]
+    Output["Final Result (Validated Content + Telemetry)"]
 
     Main --> Pipeline
     Pipeline --> Researcher
@@ -41,73 +27,165 @@ flowchart TD
     Strategist --> Writer
     Writer --> FactChecker
     
-    %% Loop 1: Evidence Gap
-    FactChecker -.->|"Loop 1: Claims lack evidence"| Researcher
-    Researcher -.->|"Provides Targeted Facts"| Writer
+    %% Loop 1: Evidence Gap Mitigation
+    FactChecker -.->|"Loop 1: Support Rate < EVIDENCE_THRESHOLD"| Researcher
+    Researcher -.->|"Merged Evidence Set"| Writer
     
-    FactChecker --> Critic
+    FactChecker -->|"Support Rate >= EVIDENCE_THRESHOLD"| Critic
     
-    %% Loop 2: Quality Revision
-    Critic -.->|"Loop 2: Critic score < 7.0"| Writer
-    Critic -->|"Score >= 7.0"| Output
+    %% Loop 2: Quality & Style Convergence
+    Critic -.->|"Loop 2: Overall Score < QUALITY_THRESHOLD"| Writer
+    Critic -->|"Overall Score >= QUALITY_THRESHOLD"| Output
 ```
-
-### The Agents
-1. **Researcher Agent:** Equipped with `searchWeb` and `fetchPage` tools. It gathers raw facts, data points, and quotes, attaching confidence and relevance metrics to each.
-2. **Strategist Agent:** Analyzes the research and creates a structured content blueprint (Hook, Body, CTA) tailored to the specified platform and audience.
-3. **Writer Agent (3 Modes):**
-   - *Mode 1 (Drafting):* Writes the initial post strictly adhering to the strategist's outline and researcher's facts.
-   - *Mode 2 (Evidence Rewrite):* Fixes specifically targeted unsupported claims using newly gathered facts.
-   - *Mode 3 (Revision):* Polishes and refines content based on critic feedback without losing original strengths.
-4. **Fact-Checker Agent:** Extracts every claim made by the writer and cross-references it against the accumulated research pool. Yields a "Support Rate %".
-5. **Critic Agent:** Evaluates the verified content against 7 distinct vectors (Clarity, Relevance, Info Density, etc.) to produce an overall score out of 10.
 
 ---
 
-## ⚙️ Project Setup
+## Core Capabilities
 
-### 1. Installation
-Clone the repository, navigate to the folder, and install dependencies:
-```bash
-npm install
+- **Autonomous External Retrieval:** Dynamic multi-query search via Tavily API and automated webpage extraction/cleaning.
+- **Strict Schema Enforcement:** All inter-agent data transfers are typed and validated using `Zod` schemas, preventing cascading format errors.
+- **Dual-Loop Self-Correction:**
+  - **Loop 1 (Evidence Gap):** Identifies unsupported statements, generates targeted delta search queries, merges newly fetched evidence, and rewrites the content.
+  - **Loop 2 (Quality Convergence):** Evaluates drafts across 7 multidimensional vectors; triggers iterative revisions until the quality threshold is met.
+- **Real-Time Cost & Token Telemetry:** Granular accounting of prompt tokens, completion tokens, prompt cache hits, latency, and estimated USD expenditure across all agent invocations.
+- **Baseline Evaluation Framework:** Built-in benchmarking module to measure multi-agent output against single-call LLM baselines across accuracy, cost, latency, and density.
+
+---
+
+## Agent Specifications
+
+| Agent | Responsibility | Tool Access | Primary Output Schema |
+| :--- | :--- | :--- | :--- |
+| **Researcher** | Gathers verifiable facts, figures, and source URLs based on topic or gap queries | `search_web`, `fetch_page` | `ResearchOutputSchema` |
+| **Strategist** | Synthesizes evidence into a structured blueprint (hook, narrative arc, CTA) | None | `ContentStrategySchema` |
+| **Writer** | Generates platform-constrained drafts strictly using verified claims | None | `GeneratedContentSchema` |
+| **Fact-Checker** | Deconstructs text into atomic claims and validates against research corpus | None | `FactCheckOutputSchema` |
+| **Critic** | Evaluates factual rigor, relevance, density, tone, clarity, and platform fit | None | `CriticOutputSchema` |
+
+---
+
+## Self-Correction Mechanisms
+
+### Loop 1: Evidence Gap Resolution
+```
+Draft -> Claim Extraction -> Cross-Corpus Verification
+  ├─ If Support Rate >= EVIDENCE_THRESHOLD -> Proceed to Critic
+  └─ If Support Rate < EVIDENCE_THRESHOLD:
+       1. Extract targeted search queries from unsupported claims.
+       2. Invoke Researcher with delta query set.
+       3. Deduplicate and merge newly acquired evidence.
+       4. Invoke Writer in Evidence Rewrite mode.
+       5. Repeat verification (bounded by MAX_EVIDENCE_LOOPS).
 ```
 
-### 2. Environment Variables
-Copy `.env.example` to `.env` and fill in your keys:
-```env
+### Loop 2: Quality & Style Convergence
+```
+Verified Content -> Multidimensional Evaluation
+  ├─ If Overall Score >= QUALITY_THRESHOLD -> Finalize Content
+  └─ If Overall Score < QUALITY_THRESHOLD:
+       1. Compile structured problem statements and recommendations.
+       2. Invoke Writer in Revision mode with preserved strengths and corrective notes.
+       3. Re-verify factual integrity and re-score with Critic.
+       4. Repeat refinement (bounded by MAX_REVISION_LOOPS).
+```
+
+---
+
+## Project Structure
+
+```
+.
+├── src/
+│   ├── agents/            # Agent definitions and run handlers
+│   │   ├── researcher.ts  # Web research and tool integration
+│   │   ├── strategist.ts  # Content angle and outline generator
+│   │   ├── writer.ts      # Multi-mode drafting engine
+│   │   ├── factChecker.ts # Claim extraction and verification
+│   │   └── critic.ts       # Evaluation across 7 scoring vectors
+│   ├── evaluation/        # Benchmarking and metrics
+│   │   ├── baseline.ts    # Single-call LLM baseline implementation
+│   │   └── metrics.ts     # Comparative reporting and analysis
+│   ├── pipeline/          # Orchestration core
+│   │   └── contentPipeline.ts # Dual-loop execution engine
+│   ├── tools/             # External retrieval tools
+│   │   ├── searchWeb.ts   # Tavily search wrapper
+│   │   ├── fetchPage.ts   # DOM-to-text cleaner and scraper
+│   │   └── index.ts       # Tool registry
+│   ├── types/             # System-wide schemas and contracts
+│   │   └── schemas.ts     # Zod schemas and TypeScript interfaces
+│   ├── utils/             # Telemetry, caching, and logging
+│   │   ├── cache.ts       # Local research cache
+│   │   ├── logger.ts      # Structured terminal logging
+│   │   └── tokenTracker.ts# Token usage and pricing tracker
+│   └── main.ts            # Application CLI entry point
+├── .env.example           # Template for environment configuration
+├── package.json           # Dependencies and scripts
+├── tsconfig.json          # TypeScript compiler configuration
+└── LICENSE                # MIT License
+```
+
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` and provide your API credentials:
+
+```bash
+cp .env.example .env
+```
+
+```ini
+# API Keys
 OPENAI_API_KEY=your_openai_api_key
 TAVILY_API_KEY=your_tavily_api_key
+
+# Models
 PRIMARY_MODEL=gpt-4o-mini
+EVALUATOR_MODEL=gpt-4o-mini
+
+# Convergence Controls
+MAX_EVIDENCE_LOOPS=2
+MAX_REVISION_LOOPS=2
+EVIDENCE_THRESHOLD=0.5
+QUALITY_THRESHOLD=7.0
 ```
 
 ---
 
-## 🛠️ How to Run
+## Execution
 
-* **Run Multi-Agent Pipeline (Default):**
-  This runs the full agent workflow using the default topic in `src/main.ts`.
-  ```bash
-  npm run start
-  ```
+### 1. Multi-Agent Pipeline Execution (Default)
+Executes the full research-to-evaluation pipeline for the configured request:
+```bash
+npm start
+```
 
-* **Run Single-LLM Baseline:**
-  This runs a basic ChatGPT-style single prompt without any agents to act as a control.
-  ```bash
-  npm run baseline
-  ```
-  *(or `npm start -- --baseline`)*
+### 2. Single-LLM Baseline Execution
+Executes an ungrounded, single-call completion control test:
+```bash
+npm run baseline
+```
 
-* **Run Both & Compare (Experiment Mode):**
-  This runs the baseline first, then the multi-agent pipeline, and prints a side-by-side comparison of cost, speed, and quality.
-  ```bash
-  npm start -- --compare
-  ```
+### 3. Comparative Evaluation Run
+Executes both baseline and pipeline consecutively, rendering a side-by-side performance grid and saving experiment telemetry to `/experimental`:
+```bash
+npm start -- --compare
+```
 
 ---
 
-## 📚 What I Learned Building This
+## Evaluation Metrics
 
-* **Why Structured Communication Matters:** Forcing agents to return strictly typed JSON (`zod` schemas) prevents cascading errors and hallucinations. If the Fact-Checker returns a boolean, it's explicitly handled in code, not left to LLM interpretation.
-* **Feedback Loops in Agents:** Constructing the Evidence Loop and Quality Loop taught me how to handle multi-step, programmatic self-correction in autonomous systems.
-* **Scientific Baseline Testing:** Running a control test (the baseline) empirically proves the value of the pipeline. It highlighted that while multi-agent architectures cost slightly more and take longer, they are significantly more factual, robust, and accurate than standard single-prompt LLM wrappers.
-* **Cost & Token Constraints:** Designing a custom token tracker taught me the importance of model frugality and prompt-caching awareness when scaling agentic workflows.
+When running in comparative mode (`--compare`), the system evaluates:
+
+- **Cost ($ USD):** Exact API expenditure calculated using active model input/output rates.
+- **Latency (seconds):** Total wall-clock time from invocation to final output.
+- **Word Count:** Length alignment against platform formatting constraints.
+- **Fact Support Rate (%):** Percentage of explicit claims backed by cited primary sources.
+- **Quality Score (1-10):** Weighted multi-vector evaluation across factual accuracy, relevance, information density, clarity, originality, platform fit, and audience fit.
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
