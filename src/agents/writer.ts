@@ -8,7 +8,7 @@ import type {
     CriticOutput,
 } from "../types/schemas.js";
 import { logAgent, logSection } from "../utils/logger.js";
-import { recordCall } from "../utils/tokenTracker.js";
+import { recordAgentResult } from "../utils/tokenTracker.js";
 import "dotenv/config";
 
 const MODEL = process.env.PRIMARY_MODEL ?? "gpt-4o-mini";
@@ -84,32 +84,10 @@ Write the post now. Track which evidence IDs you used in claimsUsed.`;
     const result = await run(writerAgent, inputMessage);
     const durationMs = Date.now() - startTime;
 
-    // Aggregate token usage across all model turns
-    const totalInputTokens = result.rawResponses.reduce(
-        (sum, r) => sum + (r.usage?.inputTokens ?? 0),
-        0
-    );
-    const totalOutputTokens = result.rawResponses.reduce(
-        (sum, r) => sum + (r.usage?.outputTokens ?? 0),
-        0
-    );
-    const totalCachedTokens = result.rawResponses.reduce(
-        (sum, r) => {
-            const details = r.usage?.inputTokensDetails;
-            if (Array.isArray(details)) {
-                return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
-            }
-            return sum;
-        },
-        0
-    );
-
-    recordCall({
+    recordAgentResult({
         agentName: `Writer Agent (v${version})`,
         model: MODEL,
-        inputTokens: totalInputTokens,
-        outputTokens: totalOutputTokens,
-        cachedInputTokens: totalCachedTokens,
+        result,
         durationMs,
     });
 
@@ -164,32 +142,10 @@ Write an improved version that addresses all the problems listed.`;
     const result = await run(writerAgent, inputMessage);
     const durationMs = Date.now() - startTime;
 
-    // Aggregate token usage across all model turns
-    const totalInputTokens = result.rawResponses.reduce(
-        (sum, r) => sum + (r.usage?.inputTokens ?? 0),
-        0
-    );
-    const totalOutputTokens = result.rawResponses.reduce(
-        (sum, r) => sum + (r.usage?.outputTokens ?? 0),
-        0
-    );
-    const totalCachedTokens = result.rawResponses.reduce(
-        (sum, r) => {
-            const details = r.usage?.inputTokensDetails;
-            if (Array.isArray(details)) {
-                return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
-            }
-            return sum;
-        },
-        0
-    );
-
-    recordCall({
+    recordAgentResult({
         agentName: `Writer Agent (v${version})`,
         model: MODEL,
-        inputTokens: totalInputTokens,
-        outputTokens: totalOutputTokens,
-        cachedInputTokens: totalCachedTokens,
+        result,
         durationMs,
     });
 
@@ -251,29 +207,10 @@ Write the improved version now.`;
   const result = await run(writerAgent, inputMessage);
   const durationMs = Date.now() - startTime;
 
-  const totalInputTokens = result.rawResponses.reduce(
-    (sum, r) => sum + (r.usage?.inputTokens ?? 0), 0
-  );
-  const totalOutputTokens = result.rawResponses.reduce(
-    (sum, r) => sum + (r.usage?.outputTokens ?? 0), 0
-  );
-  const totalCachedTokens = result.rawResponses.reduce(
-    (sum, r) => {
-      const details = r.usage?.inputTokensDetails;
-      if (Array.isArray(details)) {
-        return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
-      }
-      return sum;
-    },
-    0
-  );
-
-  recordCall({
+  recordAgentResult({
     agentName: `Writer Agent (evidence-v${version})`,
     model: MODEL,
-    inputTokens:  totalInputTokens,
-    outputTokens: totalOutputTokens,
-    cachedInputTokens: totalCachedTokens,
+    result,
     durationMs,
   });
 

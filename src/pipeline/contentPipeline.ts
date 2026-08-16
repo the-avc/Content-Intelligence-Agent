@@ -6,7 +6,7 @@ import { runCriticAgent } from "../agents/critic.js";
 
 import { loadFromCache, saveToCache } from "../utils/cache.js";
 import { initLogger, logInfo, logSuccess, logWarn, logLoop, logSection, saveResultToFile } from "../utils/logger.js";
-import { resetTracker, printCostSummary, getAllCalls } from "../utils/tokenTracker.js";
+import { printCostSummary, getAllCalls } from "../utils/tokenTracker.js";
 
 import type {
     ContentRequest,
@@ -29,9 +29,8 @@ export async function runContentPipeline(request: ContentRequest): Promise<Pipel
     const runId = crypto.randomBytes(4).toString("hex");
     const startedAt = new Date().toISOString();
 
-    // Set up logger and cost tracker for this run
+    // Set up logger for this run
     initLogger(runId);
-    resetTracker();
 
     logInfo(`Starting pipeline for topic: "${request.topic}"`);
     logInfo(`Platform: ${request.platform} | Audience: ${request.audience}`);

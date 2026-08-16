@@ -88,16 +88,44 @@ export function recordCall(params: {
   );
 }
 
+// Helper to abstract boilerplate from agent files
+export function recordAgentResult(params: {
+  agentName: string;
+  model: string;
+  result: any; // RunResult from @openai/agents
+  durationMs: number;
+}) {
+  const totalInputTokens = params.result.rawResponses.reduce(
+    (sum: number, r: any) => sum + (r.usage?.inputTokens ?? 0), 0
+  );
+  const totalOutputTokens = params.result.rawResponses.reduce(
+    (sum: number, r: any) => sum + (r.usage?.outputTokens ?? 0), 0
+  );
+  const totalCachedTokens = params.result.rawResponses.reduce(
+    (sum: number, r: any) => {
+      const details = r.usage?.inputTokensDetails;
+      if (Array.isArray(details)) {
+        return sum + details.reduce((s: number, d: any) => s + (d.cached_tokens ?? 0), 0);
+      }
+      return sum;
+    }, 0
+  );
+
+  recordCall({
+    agentName: params.agentName,
+    model: params.model,
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
+    cachedInputTokens: totalCachedTokens,
+    durationMs: params.durationMs,
+  });
+}
+
 // Print a summary of all costs at the end of a run
 export function printCostSummary() {
   logSection("💰 Run Cost Summary");
 
-  // Add up totals
-  let totalInput    = 0;
-  let totalCached   = 0;
-  let totalOutput   = 0;
-  let totalCost     = 0;
-  let totalDuration = 0;
+  let totalInput = 0, totalCached = 0, totalOutput = 0, totalCost = 0, totalDuration = 0;
 
   for (const call of calls) {
     totalInput    += call.inputTokens;
@@ -105,32 +133,12 @@ export function printCostSummary() {
     totalOutput   += call.outputTokens;
     totalCost     += call.costUSD;
     totalDuration += call.durationMs;
-  }
-
-  // Show per-agent breakdown
-  console.log("Cost per agent:");
-  for (const call of calls) {
+    
     const cacheInfo = call.cachedInputTokens > 0 ? ` [cached: ${call.cachedInputTokens}]` : "";
-    console.log(`  ${call.agentName.padEnd(18)} $${call.costUSD.toFixed(5)}${cacheInfo}`);
+    console.log(`  ${call.agentName.padEnd(25)} $${call.costUSD.toFixed(5)}${cacheInfo}`);
   }
 
-  // Show totals
-  console.log("\n--- Totals ---");
-  logCost(`Input tokens   : ${totalInput.toLocaleString()}${totalCached > 0 ? ` (cached: ${totalCached.toLocaleString()})` : ""}`);
-  logCost(`Output tokens  : ${totalOutput.toLocaleString()}`);
-  logCost(`Total API calls: ${calls.length}`);
-  logCost(`Total time     : ${(totalDuration / 1000).toFixed(1)}s`);
-  logCost(`TOTAL COST     : $${totalCost.toFixed(5)}`);
-
-  // Budget check — warn if over 80% of $3 budget
-  const BUDGET = 3.00;
-  const percentUsed = (totalCost / BUDGET) * 100;
-
-  if (percentUsed > 80) {
-    logWarn(`You've used ${percentUsed.toFixed(1)}% of your $${BUDGET} budget!`);
-  } else {
-    logCost(`Budget used: ${percentUsed.toFixed(1)}% of $${BUDGET}`);
-  }
+  console.log(`\n  TOTAL: $${totalCost.toFixed(5)} (${calls.length} calls, ${(totalDuration / 1000).toFixed(1)}s)`);
 }
 
 // Return all recorded calls (used by the pipeline to save results)

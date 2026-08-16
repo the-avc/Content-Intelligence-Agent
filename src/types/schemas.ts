@@ -23,29 +23,29 @@ export const EvidenceTypeSchema = z.enum([
 ]);
 
 export const SourceSchema = z.object({
-    url: z.string().url(),
-    title: z.string(),
-    snippet: z.string(),    // Relevant excerpt from the source
-    fetchedAt: z.string(), // ISO timestamp
+    url: z.string().describe("The source URL"),
+    title: z.string().describe("The title of the source page"),
+    snippet: z.string().describe("Relevant excerpt from the source"),
+    fetchedAt: z.string().describe("ISO timestamp of when this source was fetched"),
 });
 
 export const EvidenceItemSchema = z.object({
-    id: z.string(),                    // Unique ID, e.g. "ev_001"
-    content: z.string(),               // The actual fact/data/insight
-    type: EvidenceTypeSchema,
-    source: SourceSchema,
-    confidence: z.number().min(0).max(1), // 0.0 – 1.0
-    relevance: z.number().min(0).max(1),  // How relevant to the topic
+    id: z.string().describe("Unique ID, e.g. 'ev_001'"),
+    content: z.string().describe("The actual fact/data/insight extracted"),
+    type: EvidenceTypeSchema.describe("The classification of the evidence"),
+    source: SourceSchema.describe("The source where this evidence was found"),
+    confidence: z.number().min(0).max(1).describe("Confidence score from 0.0 to 1.0"),
+    relevance: z.number().min(0).max(1).describe("How relevant this is to the topic, from 0.0 to 1.0"),
 });
 
 export const ResearchOutputSchema = z.object({
-    topic: z.string(),
-    facts: z.array(EvidenceItemSchema),
-    keyInsights: z.array(z.string()),   // 3-5 most important takeaways
-    uncertainties: z.array(z.string()), // Things the researcher couldn't verify
-    sources: z.array(SourceSchema),
-    searchQueries: z.array(z.string()), // What search queries were used
-    researchedAt: z.string(),           // ISO timestamp
+    topic: z.string().describe("The research topic investigated"),
+    facts: z.array(EvidenceItemSchema).describe("List of facts, statistics, and opinions found"),
+    keyInsights: z.array(z.string()).describe("3-5 most important takeaways from the research"),
+    uncertainties: z.array(z.string()).describe("Things the researcher couldn't verify or find"),
+    sources: z.array(SourceSchema).describe("List of all sources consulted"),
+    searchQueries: z.array(z.string()).describe("What search queries were used"),
+    researchedAt: z.string().describe("ISO timestamp of the research completion"),
 });
 
 // STRATEGIST AGENT OUTPUT
@@ -77,7 +77,7 @@ export const GeneratedContentSchema = z.object({
     wordCount: z.number(),
     claimsUsed: z.array(z.string()), // Which evidence IDs this content draws from
     version: z.number(),        // 1 = initial, 2+ = revised
-    revisionNotes: z.string().optional(), // Why it was revised (if applicable)
+    revisionNotes: z.string().nullable().describe("Why it was revised (if applicable), or null"),
 });
 
 //FACT CHECKER AGENT OUTPUT

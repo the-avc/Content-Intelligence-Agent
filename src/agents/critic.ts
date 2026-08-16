@@ -7,7 +7,7 @@ import type {
   CriticOutput,
 } from "../types/schemas.js";
 import { logAgent, logSection } from "../utils/logger.js";
-import { recordCall } from "../utils/tokenTracker.js";
+import { recordAgentResult } from "../utils/tokenTracker.js";
 import "dotenv/config";
 
 const MODEL = process.env.PRIMARY_MODEL ?? "gpt-4o-mini";
@@ -85,32 +85,10 @@ Set requiresRevision = true if overall score is below 7.0.`;
   const result = await run(criticAgent, inputMessage);
   const durationMs = Date.now() - startTime;
 
-  // Aggregate token usage across all model turns
-  const totalInputTokens = result.rawResponses.reduce(
-    (sum, r) => sum + (r.usage?.inputTokens ?? 0),
-    0
-  );
-  const totalOutputTokens = result.rawResponses.reduce(
-    (sum, r) => sum + (r.usage?.outputTokens ?? 0),
-    0
-  );
-  const totalCachedTokens = result.rawResponses.reduce(
-    (sum, r) => {
-      const details = r.usage?.inputTokensDetails;
-      if (Array.isArray(details)) {
-        return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
-      }
-      return sum;
-    },
-    0
-  );
-
-  recordCall({
+  recordAgentResult({
     agentName: "Critic Agent",
     model: EVALUATOR_MODEL,
-    inputTokens: totalInputTokens,
-    outputTokens: totalOutputTokens,
-    cachedInputTokens: totalCachedTokens,
+    result,
     durationMs,
   });
 

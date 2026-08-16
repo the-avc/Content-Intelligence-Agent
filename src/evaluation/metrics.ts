@@ -1,4 +1,4 @@
-import type { PipelineResult } from "../types/schemas.js";
+import type { PipelineResult, FactCheckOutput, CriticOutput } from "../types/schemas.js";
 import type { BaselineResult } from "./baseline.js";
 import { logSection } from "../utils/logger.js";
 import { getTotalCost } from "../utils/tokenTracker.js";
@@ -14,6 +14,9 @@ export type ComparisonResult = {
         costUSD: number;
         durationMs: number;
         wordCount: number;
+        overallScore: number;
+        factualAccuracy: number;
+        supportRate: number;
     };
 
     pipeline: {
@@ -32,8 +35,8 @@ export type ComparisonResult = {
     comparison: {
         costDifferenceUSD: number;       // pipeline cost - baseline cost (pipeline usually costs more)
         speedDifferenceSec: number;      // pipeline time - baseline time (pipeline is slower)
-        qualityScore: number;            // pipeline overall score (baseline has no score)
-        factSupportRate: number;         // pipeline claim support % (baseline has no verification)
+        qualityScoreDifference: number;  // pipeline score - baseline score
+        factSupportRateDifference: number; // pipeline support - baseline support
     };
 };
 
@@ -41,6 +44,8 @@ export type ComparisonResult = {
 export function compareResults(
     topic: string,
     baseline: BaselineResult,
+    baselineFactCheck: FactCheckOutput,
+    baselineCritic: CriticOutput,
     pipeline: PipelineResult,
     pipelineDurationMs: number
 ): ComparisonResult {
@@ -61,6 +66,9 @@ export function compareResults(
             costUSD: baseline.costUSD,
             durationMs: baseline.durationMs,
             wordCount: baselineWords,
+            overallScore: baselineCritic.scores.overall,
+            factualAccuracy: baselineCritic.scores.factualAccuracy,
+            supportRate: baselineFactCheck.supportRate,
         },
 
         pipeline: {
@@ -78,8 +86,8 @@ export function compareResults(
         comparison: {
             costDifferenceUSD: pipelineCost - baseline.costUSD,
             speedDifferenceSec: (pipelineDurationMs - baseline.durationMs) / 1000,
-            qualityScore: pipeline.evaluation.scores.overall,
-            factSupportRate: pipeline.factCheck.supportRate,
+            qualityScoreDifference: pipeline.evaluation.scores.overall - baselineCritic.scores.overall,
+            factSupportRateDifference: pipeline.factCheck.supportRate - baselineFactCheck.supportRate,
         },
     };
 
@@ -94,8 +102,8 @@ export function compareResults(
     console.log(`║ Cost (USD)       ║ $${baseline.costUSD.toFixed(5).padEnd(12)} ║ $${pipelineCost.toFixed(5).padEnd(12)} ║`);
     console.log(`║ Speed            ║ ${(baseline.durationMs / 1000).toFixed(1)}s          ║ ${(pipelineDurationMs / 1000).toFixed(1)}s          ║`);
     console.log(`║ Word count       ║ ${String(baselineWords).padEnd(13)} ║ ${String(pipelineWords).padEnd(13)} ║`);
-    console.log(`║ Quality score    ║ N/A           ║ ${String(pipeline.evaluation.scores.overall + "/10").padEnd(13)} ║`);
-    console.log(`║ Fact support     ║ N/A           ║ ${(pipeline.factCheck.supportRate * 100).toFixed(0).padEnd(10)}%   ║`);
+    console.log(`║ Quality score    ║ ${String(baselineCritic.scores.overall + "/10").padEnd(13)} ║ ${String(pipeline.evaluation.scores.overall + "/10").padEnd(13)} ║`);
+    console.log(`║ Fact support     ║ ${(baselineFactCheck.supportRate * 100).toFixed(0).padEnd(10)}%   ║ ${(pipeline.factCheck.supportRate * 100).toFixed(0).padEnd(10)}%   ║`);
     console.log(`║ Revisions        ║ 0             ║ ${String(pipeline.meta.totalRevisions).padEnd(13)} ║`);
     console.log(`║ Sources cited    ║ 0             ║ ${String(pipeline.research.sources.length).padEnd(13)} ║`);
     console.log("╚══════════════════╩═══════════════╩═══════════════╝");
@@ -106,13 +114,22 @@ export function compareResults(
     if (pipeline.evaluation.scores.overall >= 7) {
         console.log(`  ✓ Pipeline produced quality content (${pipeline.evaluation.scores.overall}/10)`);
     } else {
-        console.log(`  ✗ Pipeline score below threshold (${pipeline.evaluation.scores.overall}/10) — needs investigation`);
+        console.log(`  ⚠ Pipeline score below threshold (${pipeline.evaluation.scores.overall}/10) — needs investigation`);
     }
 
     if (pipeline.factCheck.supportRate >= 0.7) {
         console.log(`  ✓ ${(pipeline.factCheck.supportRate * 100).toFixed(0)}% of claims verified against sources`);
     } else {
-        console.log(`  ⚠ Only ${(pipeline.factCheck.supportRate * 100).toFixed(0)}% of claims supported — consider more research loops`);
+        console.log(`  ✗ Only ${(pipeline.factCheck.supportRate * 100).toFixed(0)}% of claims supported — consider more research loops`);
+    }
+
+    const hallucinationImprovement = ((pipeline.factCheck.supportRate - baselineFactCheck.supportRate) * 100).toFixed(0);
+    if (pipeline.factCheck.supportRate > baselineFactCheck.supportRate) {
+        console.log(`  ✓ Pipeline improved factual accuracy by ${hallucinationImprovement}% over Baseline`);
+    } else if (pipeline.factCheck.supportRate < baselineFactCheck.supportRate) {
+        console.log(`  ⚠ Baseline was actually more factually accurate by ${Math.abs(Number(hallucinationImprovement))}%`);
+    } else {
+        console.log(`  ℹ Both methods had equal fact support rate (${(pipeline.factCheck.supportRate * 100).toFixed(0)}%)`);
     }
 
     console.log(`  ℹ Baseline: 1 API call | Pipeline: multiple calls + research + verification`);

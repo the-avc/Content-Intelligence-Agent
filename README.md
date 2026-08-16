@@ -42,7 +42,7 @@ flowchart TD
 
 ## Core Capabilities
 
-- **Autonomous External Retrieval:** Dynamic multi-query search via Tavily API and automated webpage extraction/cleaning.
+- **Native Deep Research:** Offloads complex multi-query research and extraction directly to the Tavily Research API, returning structured JSON and completely bypassing LLM token costs during the research phase.
 - **Strict Schema Enforcement:** All inter-agent data transfers are typed and validated using `Zod` schemas, preventing cascading format errors.
 - **Dual-Loop Self-Correction:**
   - **Loop 1 (Evidence Gap):** Identifies unsupported statements, generates targeted delta search queries, merges newly fetched evidence, and rewrites the content.
@@ -54,10 +54,10 @@ flowchart TD
 
 ## Agent Specifications
 
-| Agent | Responsibility | Tool Access | Primary Output Schema |
+| Agent | Responsibility | Implementation | Primary Output Schema |
 | :--- | :--- | :--- | :--- |
-| **Researcher** | Gathers verifiable facts, figures, and source URLs based on topic or gap queries | `search_web`, `fetch_page` | `ResearchOutputSchema` |
-| **Strategist** | Synthesizes evidence into a structured blueprint (hook, narrative arc, CTA) | None | `ContentStrategySchema` |
+| **Researcher** | Gathers verifiable facts, figures, and source URLs based on topic or gap queries | Native Tavily API | `ResearchOutputSchema` |
+| **Strategist** | Synthesizes evidence into a structured blueprint (hook, narrative arc, CTA) | OpenAI Agent | `ContentStrategySchema` |
 | **Writer** | Generates platform-constrained drafts strictly using verified claims | None | `GeneratedContentSchema` |
 | **Fact-Checker** | Deconstructs text into atomic claims and validates against research corpus | None | `FactCheckOutputSchema` |
 | **Critic** | Evaluates factual rigor, relevance, density, tone, clarity, and platform fit | None | `CriticOutputSchema` |
@@ -176,12 +176,26 @@ npm start -- --compare
 
 ## Evaluation Metrics
 
-When running in comparative mode (`--compare`), the system evaluates:
+When running in comparative mode (`--compare`), the system robustly evaluates BOTH the single-LLM Baseline and the Multi-Agent Pipeline through the Fact-Checker and Critic agents, generating a quantitative head-to-head comparison grid on the following vectors:
+
+```mermaid
+flowchart LR
+    Main["CLI (--compare)"]
+    
+    Main --> Baseline["Single LLM Baseline"]
+    Main --> Pipeline["Multi-Agent Pipeline"]
+    
+    Pipeline -.->|"Extracts Research"| Eval["FactChecker & Critic"]
+    Baseline -->|"Draft Content"| Eval
+    
+    Eval -->|"Scores Baseline"| Grid["Comparison Grid"]
+    Pipeline -->|"Pipeline Scores"| Grid
+```
 
 - **Cost ($ USD):** Exact API expenditure calculated using active model input/output rates.
 - **Latency (seconds):** Total wall-clock time from invocation to final output.
 - **Word Count:** Length alignment against platform formatting constraints.
-- **Fact Support Rate (%):** Percentage of explicit claims backed by cited primary sources.
+- **Fact Support Rate (%):** Percentage of explicit claims backed by cited primary sources. Proves the pipeline's reduction in hallucinations versus the baseline.
 - **Quality Score (1-10):** Weighted multi-vector evaluation across factual accuracy, relevance, information density, clarity, originality, platform fit, and audience fit.
 
 ---

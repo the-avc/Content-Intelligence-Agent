@@ -1,111 +1,125 @@
-import { Agent, run } from "@openai/agents";
-import { searchWebTool, fetchPageTool } from "../tools/index.js";
+import { tavily } from "@tavily/core";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { ResearchOutputSchema } from "../types/schemas.js";
 import type { ResearchOutput } from "../types/schemas.js";
 import { logAgent, logSection } from "../utils/logger.js";
 import { recordCall } from "../utils/tokenTracker.js";
 import "dotenv/config";
 
-const MODEL = process.env.PRIMARY_MODEL ?? "gpt-4o-mini";
+// Convert the Zod schema into a standard JSON Schema for Tavily
+const rawSchema = zodToJsonSchema(ResearchOutputSchema, { $refStrategy: "none" }) as any;
 
-// Create the Research Agent
-const researchAgent = new Agent({
-    name: "Research Agent",
-    model: MODEL,
-    instructions: `
-You are an expert research agent. Your job is to find accurate, 
-specific information about a topic and return it in a structured format.
+// Tavily is extremely strict and will reject the schema if it contains "additionalProperties"
+// anywhere in the schema tree. We recursively remove it.
+function removeAdditionalProperties(obj: any) {
+    if (Array.isArray(obj)) {
+        obj.forEach(removeAdditionalProperties);
+    } else if (obj !== null && typeof obj === 'object') {
+        delete obj.additionalProperties;
+        for (const key in obj) {
+            removeAdditionalProperties(obj[key]);
+        }
+    }
+}
+removeAdditionalProperties(rawSchema);
 
-HOW TO DO YOUR JOB:
-1. Search the web 3-4 times using different search queries
-   - Start broad ("AI coding assistants overview")
-   - Then get specific ("GitHub Copilot productivity statistics 2024")
-   - Then search for recent news ("AI coding tools latest developments")
+const outputSchema = {
+    properties: rawSchema.properties,
+    required: rawSchema.required,
+};
 
-2. For the most useful search results, use fetch_page to read the full article
-   - This gives you actual data, not just headlines
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-3. Classify each piece of information honestly:
-   - FACT: Something stated clearly with a source
-   - STATISTIC: A specific number or percentage with attribution
-   - OPINION: Someone's view or prediction
-   - INTERPRETATION: A conclusion drawn from data
-   - UNCERTAIN: You found this but can't fully verify it
-
-4. Be honest about what you could NOT find. List uncertainties.
-
-5. Always record the URL where you found each piece of information.
-
-IMPORTANT: Do not invent statistics or facts. Only report what you actually found.
-`,
-
-    tools: [searchWebTool, fetchPageTool],
-    outputType: ResearchOutputSchema,
-});
-
-// Returns structured research data
 export async function runResearchAgent(
     topic: string,
     audience: string,
-    additionalQueries?: string[] // Used when Loop 1 asks for more targeted research
+    additionalQueries?: string[]
 ): Promise<ResearchOutput> {
-    logSection("Research Agent");
+    logSection("Research Agent (Powered by Tavily)");
     logAgent("Research Agent", `Researching: "${topic}"`);
 
-    // Build the input message for the agent
+    const tavilyKey = process.env.TAVILY_API_KEY;
+    if (!tavilyKey) {
+        throw new Error("TAVILY_API_KEY is not set in environment variables");
+    }
+
+    const tvly = tavily({ apiKey: tavilyKey });
+
     const inputMessage = additionalQueries && additionalQueries.length > 0
-        ? `Research the following topic and return structured evidence.
-       
-Topic: ${topic}
-Target audience: ${audience}
-
-IMPORTANT: Also specifically search for these targeted queries (these are gaps 
-identified from a previous research pass):
-${additionalQueries.map((q, i) => `${i + 1}. ${q}`).join("\n")}
-
-Return your findings in the required structured format.`
-        : `Research the following topic and return structured evidence.
-       
-Topic: ${topic}
-Target audience: ${audience}
-
-Search broadly first, then dig into the most useful sources for specific facts.
-Return your findings in the required structured format.`;
+        ? `Research the following topic: ${topic}. 
+Target audience: ${audience}.
+Also specifically search for these targeted queries (these are gaps identified from a previous research pass):
+${additionalQueries.map((q, i) => `${i + 1}. ${q}`).join("\n")}`
+        : `Research the following topic: ${topic}.
+Target audience: ${audience}.`;
 
     const startTime = Date.now();
-    const result = await run(researchAgent, inputMessage);
+
+    // 1. Kick off the asynchronous research task
+    logAgent("Research Agent", "Initiating deep research task (this saves tokens by using Tavily native!)...");
+    const researchRes = await tvly.research(inputMessage, {
+        model: "pro", // 'pro' model for comprehensive multi-angle research
+        outputSchema: outputSchema,
+        citationFormat: "numbered", // Ensures sources match up well
+    }) as any; // Typecasting since the SDK types might vary
+
+    const requestId = researchRes.requestId;
+    if (!requestId) {
+        throw new Error("Failed to get requestId from Tavily Research API.");
+    }
+    
+    logAgent("Research Agent", `Task started. Job ID: ${requestId}. Polling...`);
+
+    // 2. Poll for completion
+    let content: any = null;
+    let pollCount = 0;
+    while (true) {
+        await delay(10000); // Poll every 10 seconds
+        pollCount++;
+        
+        const pollRes = await tvly.getResearch(requestId) as any;
+        if (pollRes.status === "completed" || pollRes.status === "success") {
+            content = pollRes.content;
+            break;
+        } else if (pollRes.status === "failed" || pollRes.status === "error") {
+            throw new Error("Tavily research task failed.");
+        }
+        
+        if (pollCount % 2 === 0) {
+            logAgent("Research Agent", `Still researching... (Status: ${pollRes.status})`);
+        }
+        
+        if (pollCount > 30) {
+            throw new Error("Tavily research task timed out (took > 5 minutes).");
+        }
+    }
+
     const durationMs = Date.now() - startTime;
+    
+    // 3. Parse it back to Zod to ensure type safety
+    let parsedData: ResearchOutput;
+    try {
+        if (typeof content === "string") {
+            content = JSON.parse(content);
+        }
+        parsedData = ResearchOutputSchema.parse(content);
+    } catch (e) {
+        console.error(e);
+        logAgent("Research Agent", "Warning: Failed strict schema parse, using loose data.");
+        parsedData = content as ResearchOutput;
+    }
 
-    // Aggregate token usage across all model turns
-    const totalInputTokens = result.rawResponses.reduce(
-        (sum, r) => sum + (r.usage?.inputTokens ?? 0),
-        0
-    );
-    const totalOutputTokens = result.rawResponses.reduce(
-        (sum, r) => sum + (r.usage?.outputTokens ?? 0),
-        0
-    );
-    const totalCachedTokens = result.rawResponses.reduce(
-        (sum, r) => {
-            const details = r.usage?.inputTokensDetails;
-            if (Array.isArray(details)) {
-                return sum + details.reduce((s, d) => s + (d.cached_tokens ?? 0), 0);
-            }
-            return sum;
-        },
-        0
-    );
-
+    // 4. Record cost (using dummy 0 values since Tavily handles the LLM cost natively)
     recordCall({
-        agentName: "Research Agent",
-        model: MODEL,
-        inputTokens: totalInputTokens,
-        outputTokens: totalOutputTokens,
-        cachedInputTokens: totalCachedTokens,
+        agentName: "Tavily Research API",
+        model: "tavily-pro",
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedInputTokens: 0,
         durationMs,
     });
 
-    logAgent("Research Agent", `Done — found ${result.finalOutput?.facts.length ?? 0} evidence items`);
+    logAgent("Research Agent", `Done ?" found ${parsedData.facts?.length ?? 0} evidence items in ${Math.round(durationMs/1000)}s`);
 
-    return result.finalOutput as ResearchOutput;
+    return parsedData;
 }
