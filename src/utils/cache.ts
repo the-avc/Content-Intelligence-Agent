@@ -1,26 +1,12 @@
-// src/utils/cache.ts
-// Saves research results to disk so we don't repeat the same API calls
-//
-// WHY: During development, you run the pipeline many times to test
-// different agents. Without caching, the Research Agent makes real
-// API calls every time — wasting tokens and money.
-//
-// With caching:
-//   First run  → calls the API, saves result to a file
-//   Next runs  → reads from the file, skips the API call entirely
-
 import fs from "fs";
 import path from "path";
 import type { ResearchOutput } from "../types/schemas.js";
 import { logInfo, logSuccess, logWarn } from "./logger.js";
 
-// All cache files go in this folder
 const CACHE_FOLDER = path.join(process.cwd(), "cache");
 
-// Cache expires after 24 hours — after that, we re-research
 const CACHE_EXPIRES_AFTER_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-// Create the cache folder if it doesn't exist
 function ensureCacheFolder() {
   if (!fs.existsSync(CACHE_FOLDER)) {
     fs.mkdirSync(CACHE_FOLDER);
@@ -28,12 +14,11 @@ function ensureCacheFolder() {
 }
 
 // Create a simple filename from the topic
-// e.g. "Impact of AI on jobs" → "cache/impact_of_ai_on_jobs.json"
 function getCacheFilePath(topic: string): string {
   const safeName = topic
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_") // replace special chars with underscore
-    .slice(0, 60);                // limit length
+    .replace(/[^a-z0-9]+/g, "_") 
+    .slice(0, 60); // limit length
   return path.join(CACHE_FOLDER, `${safeName}.json`);
 }
 

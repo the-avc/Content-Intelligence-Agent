@@ -1,21 +1,11 @@
-// src/utils/tokenTracker.ts
-// Tracks token usage and calculates cost for every agent call
-//
-// WHY: Every OpenAI API call uses tokens. Tokens cost money.
-// We track this so we know exactly how much each agent costs
-// and ensure we stay within our $2-3 budget.
-
 import { logCost, logWarn, logSection } from "./logger.js";
 
-// OpenAI pricing — USD per 1 million tokens (as of Aug 2026)
 // Source: platform.openai.com/docs/pricing
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   "gpt-4o-mini": { input: 0.15, output: 0.60 },
   "gpt-4o":      { input: 2.50, output: 10.00 },
 };
 
-// Returns the pricing (per 1 Million tokens) for a given model.
-// Prioritizes environment variables to allow dynamic override without code changes.
 export function getModelPricing(model: string): { input: number; output: number } {
   const customInput = process.env.CUSTOM_MODEL_INPUT_PRICE;
   const customOutput = process.env.CUSTOM_MODEL_OUTPUT_PRICE;
@@ -73,7 +63,6 @@ export function recordCall(params: {
 
   // Cost formula:
   // (tokens used / 1,000,000) × price per million
-  // Prompt cache hits get a 50% discount from standard input price
   const inputCost  = (standardInputCount / 1_000_000) * inputPrice;
   const cachedCost = (cachedCount / 1_000_000) * (inputPrice * 0.5);
   const outputCost = (params.outputTokens / 1_000_000) * outputPrice;

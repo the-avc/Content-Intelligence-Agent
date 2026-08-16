@@ -1,6 +1,3 @@
-// src/main.ts
-// Command-line entry point to run the pipeline, baseline, or side-by-side comparison
-
 import { runContentPipeline } from "./pipeline/contentPipeline.js";
 import { runBaseline } from "./evaluation/baseline.js";
 import { compareResults, saveExperiment } from "./evaluation/metrics.js";
@@ -16,15 +13,12 @@ const defaultRequest: ContentRequest = {
   objective: "Conversational",
   style: "Engaging, punchy, and hype-building",
 };
-
 async function main() {
-  // Guard clause to make sure keys are present
   if (!process.env.OPENAI_API_KEY) {
     logError("API Key Missing: Please add OPENAI_API_KEY to your .env file.");
     process.exit(1);
   }
 
-  // Parse command line flags
   const args = process.argv.slice(2);
   const mode = args[0] || "--pipeline"; // default to running the pipeline
 
